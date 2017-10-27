@@ -50,7 +50,11 @@ class MigrationsMigrateDoctrineCommand extends MigrateCommand
         Helper\DoctrineCommandHelper::setApplicationHelper($this->getApplication(), $input);
 
         $configuration = $this->getMigrationConfiguration($input, $output);
-        DoctrineCommand::configureMigrations($this->getApplication()->getKernel()->getContainer(), $configuration);
+        DoctrineCommand::configureMigrations(
+            $this->getApplication()->getKernel()->getContainer(),
+            $configuration,
+            $input->getOption('em')
+        );
 
         return parent::execute($input, $output);
     }

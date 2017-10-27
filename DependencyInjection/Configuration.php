@@ -37,6 +37,23 @@ class Configuration implements ConfigurationInterface
         $organizeMigrationModes = $this->getOrganizeMigrationsModes();
 
         $rootNode
+            ->beforeNormalization()
+                ->ifTrue(function($v) {
+                    if(empty($v)) {
+                        return true;
+                    }
+
+                    $firstConfigValue = array_shift($v);
+
+                    return !is_array($firstConfigValue);
+                })
+                ->then(function($v) {
+                   $v = array('default_entity_manager' => $v);
+                        return $v;
+                })
+            ->end()
+            ->useAttributeAsKey('em')
+            ->prototype('array')
             ->children()
                 ->scalarNode('dir_name')->defaultValue('%kernel.root_dir%/DoctrineMigrations')->cannotBeEmpty()->end()
                 ->scalarNode('namespace')->defaultValue('Application\Migrations')->cannotBeEmpty()->end()

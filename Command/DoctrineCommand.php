@@ -28,17 +28,34 @@ use Symfony\Component\DependencyInjection\Exception\InvalidArgumentException;
  */
 abstract class DoctrineCommand extends BaseCommand
 {
-    public static function configureMigrations(ContainerInterface $container, Configuration $configuration)
+    public static function configureMigrations(ContainerInterface $container, Configuration $configuration, $em)
     {
+        if ($container->hasParameter('doctrine_migrations.default_entity_manager')) {
+            $configurationPrefix = 'doctrine_migrations.default_entity_manager';
+        } elseif ($container->hasParameter('doctrine_migrations.' . $em)) {
+            $configurationPrefix = 'doctrine_migrations.' . $em;
+        } else {
+            if (null === $em) {
+                $message = 'There is no doctrine migrations configuration available for the default entity manager';
+            } else {
+                $message = sprintf(
+                    'There is no doctrine migrations configuration available for the %s entity manager',
+                    $em
+                );
+            }
+            throw new \InvalidArgumentException($message);
+         }
+ 
+        $containerParameters = $container->getParameter($configurationPrefix);
+        $dir = $containerParameters['dir_name'];
+
         if (!$configuration->getMigrationsDirectory()) {
-            $dir = $container->getParameter('doctrine_migrations.dir_name');
             if (!is_dir($dir) && !@mkdir($dir, 0777, true) && !is_dir($dir)) {
                 $error = error_get_last();
                 throw new \ErrorException($error['message']);
             }
             $configuration->setMigrationsDirectory($dir);
         } else {
-            $dir = $configuration->getMigrationsDirectory();
             // class Kernel has method getKernelParameters with some of the important path parameters
             $pathPlaceholderArray = array('kernel.root_dir', 'kernel.cache_dir', 'kernel.logs_dir');
             foreach ($pathPlaceholderArray as $pathPlaceholder) {
@@ -53,25 +70,21 @@ abstract class DoctrineCommand extends BaseCommand
             $configuration->setMigrationsDirectory($dir);
         }
         if (!$configuration->getMigrationsNamespace()) {
-            $configuration->setMigrationsNamespace($container->getParameter('doctrine_migrations.namespace'));
+            $configuration->setMigrationsNamespace($containerParameters['namespace']);
         }
         if (!$configuration->getName()) {
-            $configuration->setName($container->getParameter('doctrine_migrations.name'));
+            $configuration->setName($containerParameters['name']);
         }
         // For backward compatibility, need use a table from parameters for overwrite the default configuration
         if (!($configuration instanceof AbstractFileConfiguration) || !$configuration->getMigrationsTableName()) {
-            $configuration->setMigrationsTableName($container->getParameter('doctrine_migrations.table_name'));
+            $configuration->setMigrationsTableName($containerParameters['table_name']);
         }
         // Migrations is not register from configuration loader
         if (!($configuration instanceof AbstractFileConfiguration)) {
-            $configuration->registerMigrationsFromDirectory($configuration->getMigrationsDirectory());
+            $configuration->registerMigrationsFromDirectory($dir);
         }
 
-        if (!$configuration->getCustomTemplate()) {
-            $configuration->setCustomTemplate($container->getParameter('doctrine_migrations.custom_template'));
-        }
-
-        $organizeMigrations = $container->getParameter('doctrine_migrations.organize_migrations');
+        $organizeMigrations = $containerParameters['organize_migrations'];
         switch ($organizeMigrations) {
             case Configuration::VERSIONS_ORGANIZATION_BY_YEAR:
                 $configuration->setMigrationsAreOrganizedByYear(true);
